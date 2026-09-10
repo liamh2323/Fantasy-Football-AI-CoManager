@@ -118,13 +118,11 @@ export class ClaudeProvider extends BaseLLMProvider {
   
   getPricing(): { input_cost_per_token: number; output_cost_per_token: number; currency: string } {
     // Pricing as of early 2025 (in USD per million tokens, converted to per token)
-    const pricingMap: Record<string, any> = {
-      'claude-3-5-sonnet-20241022': { input: 3.00, output: 15.00 },
-      'claude-3-5-haiku-20241022': { input: 1.00, output: 5.00 },
-      'claude-3-opus-20240229': { input: 15.00, output: 75.00 },
-      'claude-3-sonnet-20240229': { input: 3.00, output: 15.00 },
-      'claude-3-haiku-20240307': { input: 0.25, output: 1.25 }
-    };
+   const pricingMap: Record<string, any> = {
+  'claude-sonnet-5': { input: 3.00, output: 15.00 },
+  'claude-sonnet-4-6': { input: 3.00, output: 15.00 },
+  'claude-haiku-4-5-20251001': { input: 1.00, output: 5.00 }
+};
     
     const pricing = pricingMap[this.config.model] || pricingMap['claude-3-5-sonnet-20241022'];
     
