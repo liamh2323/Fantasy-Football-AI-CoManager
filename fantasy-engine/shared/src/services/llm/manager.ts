@@ -237,6 +237,10 @@ export class LLMManager {
         };
 
         const fallbackApiKey = fallbackKeys[fallbackProvider];
+        console.log(`🔎 Primary provider: ${primaryProvider}`);
+        console.log(`🔎 Fallback provider: ${fallbackProvider}`);
+        console.log(`🔎 Fallback API key present: ${Boolean(fallbackApiKey)}`);
+        console.log(`🔎 Fallback model: ${fallbackModels[fallbackProvider]}`);
 
         if (!fallbackApiKey) {
           throw new Error(
@@ -270,6 +274,8 @@ export class LLMManager {
         const fallbackInitialized =
           await fallbackManager.initialize(fallbackConfig);
 
+        console.log(`🔎 Fallback initialization result: ${fallbackInitialized}`);
+
         if (!fallbackInitialized) {
           throw new Error(
             `Fantasy analysis failed: ${primaryProvider} failed and fallback provider ${fallbackProvider} could not be initialized`
@@ -284,6 +290,11 @@ export class LLMManager {
             `Fantasy analysis failed: fallback provider ${fallbackProvider} is unavailable`
           );
         }
+
+        console.log(
+        `🚀 Calling fallback provider: ${fallbackCurrentProvider.name} / ${fallbackConfig.model}`
+        );
+        
 
         // Retry the same analysis using the fallback provider
         let fallbackResponse = await fallbackCurrentProvider.chat(messages, {
