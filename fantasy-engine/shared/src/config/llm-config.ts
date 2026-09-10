@@ -87,102 +87,93 @@ export class LLMConfigManager {
     throw new Error('No LLM API keys found in environment variables (GEMINI_API_KEY, CLAUDE_API_KEY, OPENAI_API_KEY, PERPLEXITY_API_KEY)');
   }
 
-  private async getLLMManager(): Promise<LLMManager> {
-  if (!llmManager) {
-    llmManager = new LLMManager();
-
-    const config = await this.detectAndCreateConfig();
-
-    console.log(
-      `🤖 Initializing primary LLM with provider: ${config.provider} (${config.model})`
-    );
-
-    let success = await llmManager.initialize(config);
-
-    if (!success) {
-      console.warn(
-        `⚠️ Primary LLM initialization failed: ${config.provider}`
-      );
-
-      const fallbackProvider =
-        process.env.FALLBACK_LLM_PROVIDER;
-
-      console.log(
-        `🔄 Configured fallback provider: ${
-          fallbackProvider || 'none'
-        }`
-      );
-
-      if (
-        fallbackProvider &&
-        fallbackProvider !== config.provider
-      ) {
-        const fallbackKeys: Record<string, string | undefined> = {
-          gemini: process.env.GEMINI_API_KEY,
-          claude: process.env.CLAUDE_API_KEY,
-          openai: process.env.OPENAI_API_KEY,
-          perplexity: process.env.PERPLEXITY_API_KEY
-        };
-
-        const fallbackModels: Record<string, string> = {
-          gemini:
-            process.env.GEMINI_MODEL ||
-            'gemini-3.7-flash',
-          claude:
-            process.env.CLAUDE_MODEL ||
-            'claude-sonnet-5',
-          openai:
-            process.env.OPENAI_MODEL ||
-            'gpt-4o-mini',
-          perplexity:
-            process.env.PERPLEXITY_MODEL ||
-            'llama-3.1-sonar-small-128k-online'
-        };
-
-        const fallbackApiKey =
-          fallbackKeys[fallbackProvider];
-
-        if (!fallbackApiKey) {
-          throw new Error(
-            `Primary provider ${config.provider} failed and fallback provider ${fallbackProvider} has no API key`
-          );
-        }
-
-        const fallbackConfig: LLMConfig = {
-          provider: fallbackProvider as LLMConfig['provider'],
-          model: fallbackModels[fallbackProvider],
-          api_key: fallbackApiKey,
-          max_tokens: 1000,
-          temperature: 0.7
-        };
-
-        console.log(
-          `🔄 Attempting fallback initialization: ${fallbackConfig.provider} (${fallbackConfig.model})`
-        );
-
-        llmManager = new LLMManager();
-
-        success =
-          await llmManager.initialize(
-            fallbackConfig
-          );
-
-        if (success) {
-          console.log(
-            `✅ Fallback LLM initialized successfully: ${fallbackConfig.provider}`
-          );
-        } else {
-          throw new Error(
-            `Primary provider ${config.provider} failed and fallback provider ${fallbackConfig.provider} also failed to initialize`
-          );
-        }
-      } else {
-        throw new Error(
-          `Failed to initialize LLM with ${config.provider} and no fallback provider is configured`
-        );
-      }
-    }
+private async getLLMManager(): Promise<LLMManager> {
+  if (llmManager) {
+    return llmManager;
   }
+
+  const config = await this.detectAndCreateConfig();
+
+  console.log(
+    `🤖 Initializing primary LLM: ${config.provider} (${config.model})`
+  );
+
+  let manager = new LLMManager();
+  let success = await manager.initialize(config);
+
+  if (success) {
+    llmManager = manager;
+    console.log(
+      `✅ Primary LLM initialized: ${config.provider}`
+    );
+    return llmManager;
+  }
+
+  console.warn(
+    `⚠️ Primary LLM failed to initialize: ${config.provider}`
+  );
+
+  const fallbackProvider = process.env.FALLBACK_LLM_PROVIDER;
+
+  if (!fallbackProvider || fallbackProvider === config.provider) {
+    throw new Error(
+      `Failed to initialize LLM manager with ${config.provider} and no valid fallback is configured`
+    );
+  }
+
+  const fallbackKeys: Record<string, string | undefined> = {
+    gemini: process.env.GEMINI_API_KEY,
+    claude: process.env.CLAUDE_API_KEY,
+    openai: process.env.OPENAI_API_KEY,
+    perplexity: process.env.PERPLEXITY_API_KEY
+  };
+
+  const fallbackModels: Record<string, string> = {
+    gemini:
+      process.env.GEMINI_MODEL || 'gemini-3.7-flash',
+    claude:
+      process.env.CLAUDE_MODEL || 'claude-sonnet-5',
+    openai:
+      process.env.OPENAI_MODEL || 'gpt-4o-mini',
+    perplexity:
+      process.env.PERPLEXITY_MODEL ||
+      'llama-3.1-sonar-small-128k-online'
+  };
+
+  const fallbackApiKey = fallbackKeys[fallbackProvider];
+
+  if (!fallbackApiKey) {
+    throw new Error(
+      `Primary provider ${config.provider} failed and ${fallbackProvider} has no API key`
+    );
+  }
+
+  const fallbackConfig: LLMConfig = {
+    provider: fallbackProvider as LLMConfig['provider'],
+    model: fallbackModels[fallbackProvider],
+    api_key: fallbackApiKey,
+    max_tokens: 1000,
+    temperature: 0.7
+  };
+
+  console.log(
+    `🔄 Attempting fallback LLM: ${fallbackConfig.provider} (${fallbackConfig.model})`
+  );
+
+  manager = new LLMManager();
+  success = await manager.initialize(fallbackConfig);
+
+  if (!success) {
+    throw new Error(
+      `Primary provider ${config.provider} failed and fallback provider ${fallbackConfig.provider} also failed to initialize`
+    );
+  }
+
+  llmManager = manager;
+
+  console.log(
+    `✅ Fallback LLM initialized successfully: ${fallbackConfig.provider}`
+  );
 
   return llmManager;
 }
