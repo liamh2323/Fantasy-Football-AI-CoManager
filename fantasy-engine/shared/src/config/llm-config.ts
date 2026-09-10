@@ -26,7 +26,7 @@ export class LLMConfigManager {
     } else if (primaryProvider === 'claude' && claudeKey) {
       return {
         provider: 'claude',
-        model: 'claude-3-sonnet-20240229',
+        model: 'claude-sonnet-5',
         api_key: claudeKey,
         max_tokens: 1000,
         temperature: 0.7
@@ -61,7 +61,7 @@ export class LLMConfigManager {
     } else if (claudeKey) {
       return {
         provider: 'claude',
-        model: 'claude-3-sonnet-20240229',
+        model: 'claude-sonnet-5',
         api_key: claudeKey,
         max_tokens: 1000,
         temperature: 0.7
@@ -214,7 +214,7 @@ export class LLMConfigManager {
           break;
         case 'claude':
           config.api_key = process.env.CLAUDE_API_KEY || '';
-          config.model = 'claude-3-sonnet-20240229';
+          config.model = 'claude-sonnet-5';
           break;
         case 'openai':
           config.api_key = process.env.OPENAI_API_KEY || '';
