@@ -19,12 +19,10 @@ export class ClaudeProvider extends BaseLLMProvider {
   
   get models(): string[] {
     return [
-      'claude-3-5-sonnet-20241022',
-      'claude-3-5-haiku-20241022',
-      'claude-3-opus-20240229',
-      'claude-3-sonnet-20240229',
-      'claude-3-haiku-20240307'
-    ];
+  'claude-sonnet-5',
+  'claude-sonnet-4-6',
+  'claude-haiku-4-5-20251001'
+  ];
   }
   
   async chat(
