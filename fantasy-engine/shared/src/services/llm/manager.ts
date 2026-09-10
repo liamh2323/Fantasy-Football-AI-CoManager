@@ -211,8 +211,162 @@ export class LLMManager {
         }
       };
 
-    } catch (error: any) {
-      throw new Error(`Fantasy analysis failed: ${error.message}`);
+        } catch (error: any) {
+      const primaryProvider = this.config.provider;
+      const fallbackProvider = process.env.FALLBACK_LLM_PROVIDER;
+
+      console.error(
+        `❌ ${primaryProvider} analysis failed: ${error.message}`
+      );
+
+      // Attempt configured fallback provider
+      if (
+        fallbackProvider &&
+        fallbackProvider !== primaryProvider &&
+        ['gemini', 'claude', 'openai', 'perplexity'].includes(fallbackProvider)
+      ) {
+        console.log(
+          `🔄 Attempting LLM fallback: ${primaryProvider} → ${fallbackProvider}`
+        );
+
+        const fallbackKeys: Record<string, string | undefined> = {
+          gemini: process.env.GEMINI_API_KEY,
+          claude: process.env.CLAUDE_API_KEY,
+          openai: process.env.OPENAI_API_KEY,
+          perplexity: process.env.PERPLEXITY_API_KEY
+        };
+
+        const fallbackApiKey = fallbackKeys[fallbackProvider];
+
+        if (!fallbackApiKey) {
+          throw new Error(
+            `Fantasy analysis failed: ${primaryProvider} failed and no API key exists for fallback provider ${fallbackProvider}`
+          );
+        }
+
+        const fallbackModels: Record<string, string> = {
+          gemini: process.env.GEMINI_MODEL || 'gemini-3.7-flash',
+          claude: process.env.CLAUDE_MODEL || 'claude-sonnet-5',
+          openai: process.env.OPENAI_MODEL || 'gpt-3.5-turbo',
+          perplexity:
+            process.env.PERPLEXITY_MODEL ||
+            'llama-3.1-sonar-small-128k-online'
+        };
+
+        const fallbackConfig: LLMConfig = {
+          provider: fallbackProvider as LLMConfig['provider'],
+          model: fallbackModels[fallbackProvider],
+          api_key: fallbackApiKey,
+          max_tokens: 1000,
+          temperature: 0.7
+        };
+
+        console.log(
+          `🔄 Initializing fallback provider ${fallbackProvider} (${fallbackConfig.model})`
+        );
+
+        const fallbackManager = new LLMManager();
+
+        const fallbackInitialized =
+          await fallbackManager.initialize(fallbackConfig);
+
+        if (!fallbackInitialized) {
+          throw new Error(
+            `Fantasy analysis failed: ${primaryProvider} failed and fallback provider ${fallbackProvider} could not be initialized`
+          );
+        }
+
+        const fallbackCurrentProvider =
+          fallbackManager.getCurrentProvider();
+
+        if (!fallbackCurrentProvider) {
+          throw new Error(
+            `Fantasy analysis failed: fallback provider ${fallbackProvider} is unavailable`
+          );
+        }
+
+        // Retry the same analysis using the fallback provider
+        let fallbackResponse = await fallbackCurrentProvider.chat(messages, {
+          tools,
+          max_tokens: 4000,
+          temperature: 0.3,
+          tool_choice: 'auto'
+        });
+
+        let fallbackToolCallCount = 0;
+
+        if (
+          fallbackResponse.tool_calls &&
+          fallbackResponse.tool_calls.length > 0
+        ) {
+          const toolResults =
+            await fallbackManager.executeFantasyTools(
+              fallbackResponse.tool_calls
+            );
+
+          fallbackToolCallCount = fallbackResponse.tool_calls.length;
+
+          if (fallbackCurrentProvider.executeToolsAndContinue) {
+            fallbackResponse =
+              await fallbackCurrentProvider.executeToolsAndContinue(
+                messages,
+                fallbackResponse.tool_calls,
+                toolResults,
+                tools
+              );
+          }
+        }
+
+        const recommendations =
+          fallbackManager.parseRecommendations(
+            fallbackResponse.content
+          );
+
+        const pricing =
+          fallbackCurrentProvider.getPricing();
+
+        const tokensUsed =
+          fallbackResponse.usage?.total_tokens || 0;
+
+        const estimatedCost =
+          (fallbackResponse.usage?.input_tokens || 0) *
+            pricing.input_cost_per_token +
+          (fallbackResponse.usage?.output_tokens || 0) *
+            pricing.output_cost_per_token;
+
+        await costMonitor.logCost({
+          provider: fallbackConfig.provider,
+          model: fallbackConfig.model,
+          cost: estimatedCost,
+          tokens_used: tokensUsed,
+          action_type: request.context.action_type,
+          week: request.context.week
+        });
+
+        console.log(
+          `✅ Fallback succeeded: ${primaryProvider} → ${fallbackProvider}`
+        );
+
+        return {
+          summary: fallbackResponse.content,
+          recommendations,
+          cost_estimate: {
+            tokens_used: tokensUsed,
+            estimated_cost: estimatedCost,
+            currency: pricing.currency
+          },
+          metadata: {
+            provider: fallbackCurrentProvider.name,
+            model: fallbackConfig.model,
+            response_time_ms: Date.now() - startTime,
+            tool_calls_made: fallbackToolCallCount
+          }
+        };
+      }
+
+      throw new Error(
+        `Fantasy analysis failed: ${error.message}`
+      );
     }
   }
 
@@ -357,7 +511,7 @@ Be concise but thorough. This is time-sensitive fantasy advice.`;
     ];
   }
 
-  private async executeFantasyTools(toolCalls: any[]): Promise<any[]> {
+   async executeFantasyTools(toolCalls: any[]): Promise<any[]> { {
     // This would integrate with your existing MCP tool execution
     // For now, return mock results
     return toolCalls.map(call => ({
@@ -367,7 +521,7 @@ Be concise but thorough. This is time-sensitive fantasy advice.`;
     }));
   }
 
-  private parseRecommendations(content: string): any[] {
+  parseRecommendations(content: string): any[] {
     // Parse the LLM response for structured recommendations
     const recommendations = [];
     const lines = content.split('\n');
