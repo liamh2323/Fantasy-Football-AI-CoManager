@@ -454,122 +454,7 @@ jobs:
               # Extract full LLM response for complete transparency
             echo "🔍 Searching JSON recursively for full LLM response..."
 
-# First try the known locations
-LEAGUE_1_RESPONSE=$(jq -r '.summary[0].fullLLMResponse // empty' "$RESULTS_FILE" 2>/dev/null)
-LEAGUE_2_RESPONSE=$(jq -r '.summary[1].fullLLMResponse // empty' "$RESULTS_FILE" 2>/dev/null)
 
-echo "League 1 response: ${#LEAGUE_1_RESPONSE} characters"
-echo "League 2 response: ${#LEAGUE_2_RESPONSE} characters"
-
-# Combine responses when both leagues exist
-if [[ -n "$LEAGUE_1_RESPONSE" && -n "$LEAGUE_2_RESPONSE" ]]; then
-  LEAGUE_1_NAME=$(jq -r '.summary[0].league // "Main League"' "$RESULTS_FILE" 2>/dev/null)
-  LEAGUE_2_NAME=$(jq -r '.summary[1].league // "Secondary League"' "$RESULTS_FILE" 2>/dev/null)
-
-  FULL_LLM_RESPONSE="**📊 ${LEAGUE_1_NAME}:**"$'\n\n'"${LEAGUE_1_RESPONSE}"$'\n\n'"**📊 ${LEAGUE_2_NAME}:**"$'\n\n'"${LEAGUE_2_RESPONSE}"
-
-elif [[ -n "$LEAGUE_1_RESPONSE" ]]; then
-  FULL_LLM_RESPONSE="$LEAGUE_1_RESPONSE"
-
-elif [[ -n "$LEAGUE_2_RESPONSE" ]]; then
-  FULL_LLM_RESPONSE="$LEAGUE_2_RESPONSE"
-fi
-
-# Try other known locations
-if [[ -z "$FULL_LLM_RESPONSE" ]]; then
-  FULL_LLM_RESPONSE=$(jq -r '.analysis_results.leagues[0].analysis.summary.fullLLMResponse // empty' "$RESULTS_FILE" 2>/dev/null)
-fi
-
-if [[ -z "$FULL_LLM_RESPONSE" ]]; then
-  FULL_LLM_RESPONSE=$(jq -r '.analysis_results.leagues[0].analysis.recommendations[0].analysis // empty' "$RESULTS_FILE" 2>/dev/null)
-fi
-
-if [[ -z "$FULL_LLM_RESPONSE" ]]; then
-  FULL_LLM_RESPONSE=$(jq -r '.insights.analysis // empty' "$RESULTS_FILE" 2>/dev/null)
-fi
-
-if [[ -z "$FULL_LLM_RESPONSE" ]]; then
-  FULL_LLM_RESPONSE=$(jq -r '.recommendations[0].analysis // empty' "$RESULTS_FILE" 2>/dev/null)
-fi
-
-if [[ -z "$FULL_LLM_RESPONSE" ]]; then
-  FULL_LLM_RESPONSE=$(jq -r '.leagues[0].analysis // empty' "$RESULTS_FILE" 2>/dev/null)
-fi
-
-# Final fallback: recursively search the entire JSON object.
-# Prefer fields explicitly named fullLLMResponse.
-if [[ -z "$FULL_LLM_RESPONSE" ]]; then
-  echo "🔎 Performing recursive search for fullLLMResponse..."
-
-  FULL_LLM_RESPONSE=$(jq -r '
-    .. |
-    objects |
-    .fullLLMResponse? //
-    empty
-  ' "$RESULTS_FILE" 2>/dev/null | awk 'length > 50' | head -1)
-fi
-
-# Final content-based fallback: find a large string that looks like the
-# generated fantasy analysis.
-if [[ -z "$FULL_LLM_RESPONSE" ]]; then
-  echo "🔎 Performing content-based search..."
-
-  FULL_LLM_RESPONSE=$(jq -r '
-    .. |
-    strings |
-    select(
-      length > 500 and
-      (
-        contains("QB") or
-        contains("RB") or
-        contains("WR") or
-        contains("TE") or
-        contains("Recommendation") or
-        contains("recommendation")
-      )
-    )
-  ' "$RESULTS_FILE" 2>/dev/null | head -1)
-fi
-
-if [[ -n "$FULL_LLM_RESPONSE" ]]; then
-  echo "✅ Found complete LLM response: ${#FULL_LLM_RESPONSE} characters"
-else
-  echo "❌ No complete LLM response found in JSON structure"
-  echo "Available scalar paths:"
-  jq -r 'paths(scalars) as $p | $p | join(".")' "$RESULTS_FILE" 2>/dev/null | head -50
-fi
-              
-              if [[ -z "$FULL_LLM_RESPONSE" ]]; then
-                FULL_LLM_RESPONSE=$(cat "$RESULTS_FILE" | jq -r '.analysis_results.leagues[0].analysis.summary.fullLLMResponse // empty' 2>/dev/null)
-                echo "Path 3 (.analysis_results.leagues[0].analysis.summary.fullLLMResponse): Found ${#FULL_LLM_RESPONSE} characters"
-              fi
-              
-              if [[ -z "$FULL_LLM_RESPONSE" ]]; then
-                FULL_LLM_RESPONSE=$(cat "$RESULTS_FILE" | jq -r '.analysis_results.leagues[0].analysis.recommendations[0].analysis // empty' 2>/dev/null)
-                echo "Path 4 (.analysis_results.leagues[0].analysis.recommendations[0].analysis): Found ${#FULL_LLM_RESPONSE} characters"
-              fi
-              
-              if [[ -z "$FULL_LLM_RESPONSE" ]]; then
-                FULL_LLM_RESPONSE=$(cat "$RESULTS_FILE" | jq -r '.insights.analysis // empty' 2>/dev/null)
-                echo "Path 5 (.insights.analysis): Found ${#FULL_LLM_RESPONSE} characters"
-              fi
-              
-              if [[ -z "$FULL_LLM_RESPONSE" ]]; then
-                FULL_LLM_RESPONSE=$(cat "$RESULTS_FILE" | jq -r '.recommendations[0].analysis // empty' 2>/dev/null)
-                echo "Path 6 (.recommendations[0].analysis): Found ${#FULL_LLM_RESPONSE} characters"
-              fi
-              
-              if [[ -z "$FULL_LLM_RESPONSE" ]]; then
-                FULL_LLM_RESPONSE=$(cat "$RESULTS_FILE" | jq -r '.leagues[0].analysis // empty' 2>/dev/null)
-                echo "Path 7 (.leagues[0].analysis): Found ${#FULL_LLM_RESPONSE} characters"
-              fi
-              
-              # If still empty, try to get from any analysis field in the JSON
-              if [[ -z "$FULL_LLM_RESPONSE" ]]; then
-                echo "Trying deep search for LLM response content..."
-                FULL_LLM_RESPONSE=$(cat "$RESULTS_FILE" | jq -r '.. | select(type == "string" and length > 500 and (contains("QB") or contains("RB") or contains("WR") or contains("**") or contains("Recommendation"))) | select(. != null) // empty' 2>/dev/null | head -1)
-                echo "Deep search: Found ${#FULL_LLM_RESPONSE} characters"
-              fi
               
               # Extract data verification info for success case
               ESPN_AUTH=$(cat "$RESULTS_FILE" | jq -r '.data_verification.espn_authenticated // false' 2>/dev/null)
@@ -599,6 +484,56 @@ fi
           else
             echo "⚠️ No results file found in expected locations"
           fi
+              # Extract full LLM response for complete transparency
+              echo "🔍 Searching JSON recursively for full LLM response..."
+
+              LEAGUE_1_RESPONSE=$(jq -r '.summary[0].fullLLMResponse // empty' "$RESULTS_FILE" 2>/dev/null)
+              LEAGUE_2_RESPONSE=$(jq -r '.summary[1].fullLLMResponse // empty' "$RESULTS_FILE" 2>/dev/null)
+
+              echo "League 1 response: ${#LEAGUE_1_RESPONSE} characters"
+              echo "League 2 response: ${#LEAGUE_2_RESPONSE} characters"
+
+              if [[ -n "$LEAGUE_1_RESPONSE" && -n "$LEAGUE_2_RESPONSE" ]]; then
+                LEAGUE_1_NAME=$(jq -r '.summary[0].league // "Main League"' "$RESULTS_FILE" 2>/dev/null)
+                LEAGUE_2_NAME=$(jq -r '.summary[1].league // "Secondary League"' "$RESULTS_FILE" 2>/dev/null)
+
+                FULL_LLM_RESPONSE="**📊 ${LEAGUE_1_NAME}:**"$'\n\n'"${LEAGUE_1_RESPONSE}"$'\n\n'"**📊 ${LEAGUE_2_NAME}:**"$'\n\n'"${LEAGUE_2_RESPONSE}"
+              elif [[ -n "$LEAGUE_1_RESPONSE" ]]; then
+                FULL_LLM_RESPONSE="$LEAGUE_1_RESPONSE"
+              elif [[ -n "$LEAGUE_2_RESPONSE" ]]; then
+                FULL_LLM_RESPONSE="$LEAGUE_2_RESPONSE"
+              fi
+
+              if [[ -z "$FULL_LLM_RESPONSE" ]]; then
+                FULL_LLM_RESPONSE=$(jq -r '.analysis_results.leagues[0].analysis.summary.fullLLMResponse // empty' "$RESULTS_FILE" 2>/dev/null)
+              fi
+
+              if [[ -z "$FULL_LLM_RESPONSE" ]]; then
+                FULL_LLM_RESPONSE=$(jq -r '.analysis_results.leagues[0].analysis.recommendations[0].analysis // empty' "$RESULTS_FILE" 2>/dev/null)
+              fi
+
+              if [[ -z "$FULL_LLM_RESPONSE" ]]; then
+                FULL_LLM_RESPONSE=$(jq -r '.insights.analysis // empty' "$RESULTS_FILE" 2>/dev/null)
+              fi
+
+              if [[ -z "$FULL_LLM_RESPONSE" ]]; then
+                FULL_LLM_RESPONSE=$(jq -r '.recommendations[0].analysis // empty' "$RESULTS_FILE" 2>/dev/null)
+              fi
+
+              if [[ -z "$FULL_LLM_RESPONSE" ]]; then
+                FULL_LLM_RESPONSE=$(jq -r '.leagues[0].analysis // empty' "$RESULTS_FILE" 2>/dev/null)
+              fi
+
+              # Recursive fallback: find any field named fullLLMResponse
+              if [[ -z "$FULL_LLM_RESPONSE" ]]; then
+                FULL_LLM_RESPONSE=$(jq -r '.. | objects | .fullLLMResponse? // empty' "$RESULTS_FILE" 2>/dev/null | head -1)
+              fi
+
+              if [[ -n "$FULL_LLM_RESPONSE" ]]; then
+                echo "✅ Found complete LLM response: ${#FULL_LLM_RESPONSE} characters"
+              else
+                echo "❌ No complete LLM response found in JSON structure"
+              fi
           
           
           # Function to send Discord messages in chunks
