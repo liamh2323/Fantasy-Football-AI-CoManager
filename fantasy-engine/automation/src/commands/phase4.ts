@@ -110,9 +110,10 @@ export async function executePhase4Intelligence(options: Phase4Options = {}): Pr
     const { llmConfig: llmConfigService } = await import('@fantasy-ai/shared');
     const llmInitialized = await llmConfigService.initializeLLM();
     if (!llmInitialized) {
-      throw new Error('Failed to initialize LLM before league analysis');
+      console.warn('⚠️ LLM pre-initialization failed - continuing with per-league error handling');
+    } else {
+      console.log('✅ LLM pre-initialization complete');
     }
-    console.log('✅ LLM pre-initialization complete');
 
     // Execute intelligence based on specific mode
     switch (mode) {
